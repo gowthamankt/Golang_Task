@@ -1,0 +1,36 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+type Customer struct {
+	Name  string `json:"name"`
+	City  string `json:"city"`
+	Email string `json:"mail_id"`
+}
+
+func main() {
+
+	http.HandleFunc("/display", Display)
+	http.HandleFunc("/Details", details)
+
+	http.ListenAndServe("localhost:5000", nil)
+
+}
+func Display(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "This is the Output")
+}
+
+func details(w http.ResponseWriter, r *http.Request) {
+	customer := []Customer{
+		{Name: "Gowthaman", City: "Tirupur", Email: "gowthaman20t@gmail.com"},
+		{Name: "Dhanush", City: "Tirupur", Email: "dhanush@gmail.com"},
+		{Name: "Dharun", City: "Tirupur", Email: "dharun@gmail.com"},
+	}
+	w.Header().Add("content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(customer)
+}
