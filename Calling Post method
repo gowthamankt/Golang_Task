@@ -1,0 +1,52 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+type Customer struct {
+	Name  string `json:"name"`
+	City  string `json:"city"`
+	Email string `json:"mail_id"`
+}
+
+func main() {
+
+	http.HandleFunc("/display", Display)
+	http.HandleFunc("/Details", details)
+
+	http.ListenAndServe("localhost:5000", nil)
+
+}
+func Display(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "This is the Output")
+}
+
+func details(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var newCustomer Customer
+
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&newCustomer)
+		if err != nil {
+			// If there's an error decoding, respond with a bad request error
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		customer := map[string]string{
+			"name":  newCustomer.Name,
+			"city":  newCustomer.City,
+			"email": newCustomer.Email,
+		}
+
+		json.NewEncoder(w).Encode(customer)
+	} else {
+
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+
+	}
+}
