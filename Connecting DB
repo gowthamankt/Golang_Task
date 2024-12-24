@@ -1,0 +1,110 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	_ "github.com/lib/pq" // PostgreSQL driver
+)
+
+type Customer struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	City  string `json:"city"`
+	Email string `json:"mail_id"`
+}
+
+var db *sql.DB
+
+func init() {
+	// Correct PostgreSQL connection string format
+	// Replace these values with your actual PostgreSQL database credentials
+	connStr := "host=localhost port=5432 user=postgres password=1234 dbname=postgres sslmode=disable"
+
+	// Open a connection to the PostgreSQL database
+	var err error
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check if the database connection is successful
+	if err := db.Ping(); err != nil {
+		log.Fatal("Database connection failed: ", err)
+	}
+	fmt.Println("Connected to the database!")
+}
+
+func main() {
+	// Define HTTP routes and handlers
+	http.HandleFunc("/display", Display)
+	http.HandleFunc("/Details", details)
+
+	// Start the HTTP server
+	log.Println("Server is running on localhost:5001...")
+	http.ListenAndServe("localhost:5001", nil)
+}
+
+// Handler to display a simple message
+func Display(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "This is the Output")
+}
+
+// Handler to insert and retrieve customer details
+func details(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var customers []Customer
+
+		// Decode the incoming JSON request body
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&customers)
+		if err != nil {
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+
+		// Insert each customer into the database
+		for _, customer := range customers {
+			_, err := db.Exec("INSERT INTO customers (id,name, city, email) VALUES ($1, $2, $3, $4)",
+				customer.ID, customer.Name, customer.City, customer.Email)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Error inserting customer: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Respond with a success message
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Customers added successfully!"})
+
+	} else if r.Method == http.MethodGet {
+		// Fetch customers from the database if GET request is made
+		rows, err := db.Query("SELECT id, name, city, email FROM customers")
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var customers []Customer
+		for rows.Next() {
+			var customer Customer
+			if err := rows.Scan(&customer.ID, &customer.Name, &customer.City, &customer.Email); err != nil {
+				http.Error(w, fmt.Sprintf("Error scanning rows: %v", err), http.StatusInternalServerError)
+				return
+			}
+			customers = append(customers, customer)
+		}
+
+		// Respond with the list of customers as JSON
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(customers)
+
+	} else {
+		// Handle invalid request method
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
