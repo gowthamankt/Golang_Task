@@ -1,0 +1,149 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/google/uuid" // Import UUID package
+	_ "github.com/lib/pq"    // PostgreSQL driver
+	"gorm.io/gorm"
+)
+
+type Customer struct {
+	gorm.Model
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	City  string    `json:"city"`
+	Email string    `json:"mail_id"`
+}
+
+var db *sql.DB
+
+func init() {
+	connStr := "host=localhost port=5432 user=postgres password=1234 dbname=postgres sslmode=disable"
+
+	var err error
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Ping(); err != nil {
+		log.Fatal("Database connection failed: ", err)
+	}
+	fmt.Println("Connected to the database!")
+}
+
+func main() {
+	http.HandleFunc("/customers", handleCustomers)
+	http.HandleFunc("/updateCustomer", updateCustomer)
+	http.HandleFunc("/deleteCustomer", deleteCustomer)
+
+	log.Println("Server is running on localhost:5003...")
+	http.ListenAndServe("localhost:5003", nil)
+}
+
+func handleCustomers(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		// Get all customers from the database
+		rows, err := db.Query("SELECT id, name, city, email FROM customers")
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var customers []Customer
+		for rows.Next() {
+			var customer Customer
+			if err := rows.Scan(&customer.ID, &customer.Name, &customer.City, &customer.Email); err != nil {
+				http.Error(w, fmt.Sprintf("Error scanning rows: %v", err), http.StatusInternalServerError)
+				return
+			}
+			customers = append(customers, customer)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(customers)
+
+	case http.MethodPost:
+		// Add new customers to the database
+		var customers []Customer
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&customers)
+		if err != nil {
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+
+		for _, customer := range customers {
+			_, err := db.Exec("INSERT INTO customers (id, name, city, email) VALUES ($1, $2, $3, $4)",
+				customer.ID, customer.Name, customer.City, customer.Email)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Error inserting customer: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Customers added successfully!"})
+
+	default:
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
+
+func updateCustomer(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPut {
+		var customer Customer
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&customer)
+		if err != nil {
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+
+		_, err = db.Exec("UPDATE customers SET name = $1, city = $2, email = $3 WHERE id = $4",
+			customer.Name, customer.City, customer.Email, customer.ID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error updating customer: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Customer updated successfully!"})
+
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
+
+func deleteCustomer(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodDelete {
+		var request struct {
+			ID uuid.UUID `json:"id"`
+		}
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&request)
+		if err != nil {
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+
+		_, err = db.Exec("DELETE FROM customers WHERE id = $1", request.ID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error deleting customer: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully!"})
+
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
