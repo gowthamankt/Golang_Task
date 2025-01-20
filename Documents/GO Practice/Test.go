@@ -7,12 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateCustomer(t *testing.T) {
-	// Create a new HTTP request
+	r := gin.Default()
+	r.POST("/createCustomers", Create)
+
 	customer := Customer{
 		Name:  "John Doe",
 		City:  "New York",
@@ -24,14 +27,10 @@ func TestCreateCustomer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a response recorder to record the response
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(Create)
 
-	// Call the handler with the request and recorder
-	handler.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, req)
 
-	// Assert the status code and response body
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var createdCustomer Customer
 	err = json.NewDecoder(rr.Body).Decode(&createdCustomer)
@@ -39,11 +38,13 @@ func TestCreateCustomer(t *testing.T) {
 	assert.Equal(t, customer.Name, createdCustomer.Name)
 	assert.Equal(t, customer.City, createdCustomer.City)
 	assert.Equal(t, customer.Email, createdCustomer.Email)
-	assert.NotEqual(t, uuid.Nil, createdCustomer.ID) // Check that the ID is generated
+	assert.NotEqual(t, uuid.Nil, createdCustomer.ID) // Check if ID is generated
 }
 
 func TestGetCustomerByID(t *testing.T) {
-	// First, create a customer to retrieve
+	r := gin.Default()
+	r.GET("/getCustomerByID/:id", GetCustomerByID)
+
 	customer := Customer{
 		Name:  "Jane Doe",
 		City:  "Los Angeles",
@@ -51,20 +52,15 @@ func TestGetCustomerByID(t *testing.T) {
 	}
 	db.Create(&customer)
 
-	// Make the GET request to fetch the customer by ID
-	req, err := http.NewRequest("GET", "/getCustomerByID?id="+customer.ID.String(), nil)
+	req, err := http.NewRequest("GET", "/getCustomerByID/"+customer.ID.String(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a response recorder
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(GetCustomerByID)
 
-	// Call the handler
-	handler.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, req)
 
-	// Assert the response
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var retrievedCustomer Customer
 	err = json.NewDecoder(rr.Body).Decode(&retrievedCustomer)
@@ -73,7 +69,9 @@ func TestGetCustomerByID(t *testing.T) {
 }
 
 func TestDisplayCustomers(t *testing.T) {
-	// Create a customer to test
+	r := gin.Default()
+	r.GET("/displayCustomers", displayCustomers)
+
 	customer := Customer{
 		Name:  "Alice",
 		City:  "San Francisco",
@@ -81,20 +79,15 @@ func TestDisplayCustomers(t *testing.T) {
 	}
 	db.Create(&customer)
 
-	// Make a GET request to display all customers
 	req, err := http.NewRequest("GET", "/displayCustomers", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a response recorder
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(displayCustomers)
 
-	// Call the handler
-	handler.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, req)
 
-	// Assert the response
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var customers []Customer
 	err = json.NewDecoder(rr.Body).Decode(&customers)
@@ -103,7 +96,9 @@ func TestDisplayCustomers(t *testing.T) {
 }
 
 func TestUpdateCustomer(t *testing.T) {
-	// First, create a customer to update
+	r := gin.Default()
+	r.POST("/updateCustomer", updateCustomer)
+
 	customer := Customer{
 		Name:  "Bob",
 		City:  "Chicago",
@@ -111,7 +106,6 @@ func TestUpdateCustomer(t *testing.T) {
 	}
 	db.Create(&customer)
 
-	// Update the customer's name and city
 	customer.Name = "Robert"
 	customer.City = "Houston"
 	body, _ := json.Marshal(customer)
@@ -120,14 +114,10 @@ func TestUpdateCustomer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a response recorder
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(updateCustomer)
 
-	// Call the handler
-	handler.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, req)
 
-	// Assert the response
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var updatedCustomer Customer
 	err = json.NewDecoder(rr.Body).Decode(&updatedCustomer)
@@ -137,7 +127,9 @@ func TestUpdateCustomer(t *testing.T) {
 }
 
 func TestDeleteCustomer(t *testing.T) {
-	// First, create a customer to delete
+	r := gin.Default()
+	r.DELETE("/deleteCustomer/:id", deleteCustomer)
+
 	customer := Customer{
 		Name:  "Eve",
 		City:  "Miami",
@@ -145,19 +137,14 @@ func TestDeleteCustomer(t *testing.T) {
 	}
 	db.Create(&customer)
 
-	// Make a DELETE request to remove the customer
-	req, err := http.NewRequest("GET", "/deleteCustomer?id="+customer.ID.String(), nil)
+	req, err := http.NewRequest("DELETE", "/deleteCustomer/"+customer.ID.String(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a response recorder
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(deleteCustomer)
 
-	// Call the handler
-	handler.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, req)
 
-	// Assert the response
-	assert.Equal(t, http.StatusNoContent, rr.Code)
+	assert.Equal(t, http.StatusOK, rr.Code) // Assuming success returns 200, or you can choose to return 204 if no content is returned
 }

@@ -1,24 +1,16 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func displayCustomers(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		var customers []Customer
-
-		if err := db.Find(&customers).Error; err != nil {
-			http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(customers)
-
-	} else {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+func displayCustomers(c *gin.Context) {
+	var customers []Customer
+	if err := db.Find(&customers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch customers"})
+		return
 	}
+	c.JSON(http.StatusOK, customers)
 }

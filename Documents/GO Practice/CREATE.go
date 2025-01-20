@@ -1,39 +1,26 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/google/uuid"
 )
 
-func Create(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		var customers []Customer
-
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&customers)
-		if err != nil {
-			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
-			return
-		}
-
-		for _, customer := range customers {
-			if customer.ID == uuid.Nil {
-				customer.ID = uuid.New()
-			}
-
-			if err := db.Create(&customer).Error; err != nil {
-				http.Error(w, fmt.Sprintf("Error inserting customer: %v", err), http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": "Customers added successfully!"})
-
-	} else {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+func Create(c *gin.Context) {
+	var customer Customer
+	if err := c.ShouldBindJSON(&customer); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+
+	customer.ID = uuid.New()
+
+	if err := db.Create(&customer).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create customer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, customer)
 }

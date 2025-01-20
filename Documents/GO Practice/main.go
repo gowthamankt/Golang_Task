@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,6 +22,7 @@ type Customer struct {
 func init() {
 	connStr := "host=localhost port=5432 user=postgres password=1234 dbname=postgres sslmode=disable"
 	var err error
+
 	db, err = gorm.Open(postgres.Open(connStr), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Error connecting to the database: ", err)
@@ -35,12 +36,16 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/displayCustomers", displayCustomers)
-	http.HandleFunc("/createCustomers", Create)
-	http.HandleFunc("/getCustomerByID", GetCustomerByID)
-	http.HandleFunc("/updateCustomer", updateCustomer)
-	http.HandleFunc("/deleteCustomer", deleteCustomer)
+	r := gin.Default()
+
+	r.GET("/displayCustomers", displayCustomers)
+	r.POST("/createCustomers", Create)
+	r.GET("/getCustomerByID/:id", GetCustomerByID)
+	r.PUT("/updateCustomer", updateCustomer)
+	r.DELETE("/deleteCustomer/:id", deleteCustomer)
 
 	log.Println("Server is running on localhost:5002...")
-	http.ListenAndServe("localhost:5002", nil)
+	if err := r.Run("localhost:5002"); err != nil {
+		log.Fatal("Server failed to start: ", err)
+	}
 }
